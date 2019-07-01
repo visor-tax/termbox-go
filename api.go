@@ -12,6 +12,37 @@ import "time"
 
 // public API
 
+// Reset resets the terminal by reissuing the init commands.
+// Useful if you fork to vim by piping stdio, cause it gives commands to change the terminal mode that aren't compatible with termbox.
+func Reset() error {
+	err := tcgetattr(out.Fd(), &orig_tios)
+	if err != nil {
+		return err
+	}
+
+	tios := orig_tios
+	tios.Iflag &^= syscall_IGNBRK | syscall_BRKINT | syscall_PARMRK |
+		syscall_ISTRIP | syscall_INLCR | syscall_IGNCR |
+		syscall_ICRNL | syscall_IXON
+	tios.Lflag &^= syscall_ECHO | syscall_ECHONL | syscall_ICANON |
+		syscall_ISIG | syscall_IEXTEN
+	tios.Cflag &^= syscall_CSIZE | syscall_PARENB
+	tios.Cflag |= syscall_CS8
+	tios.Cc[syscall_VMIN] = 1
+	tios.Cc[syscall_VTIME] = 0
+
+	err = tcsetattr(out.Fd(), &tios)
+	if err != nil {
+		return err
+	}
+
+	out.WriteString(funcs[t_enter_ca])
+	out.WriteString(funcs[t_enter_keypad])
+	// out.WriteString(funcs[t_hide_cursor])
+	out.WriteString(funcs[t_clear_screen])
+	return nil
+}
+
 // Initializes termbox library. This function should be called before any other functions.
 // After successful initialization, the library must be finalized using 'Close' function.
 //
